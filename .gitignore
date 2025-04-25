@@ -1,4 +1,4 @@
-/.vscode
-/dawn
-/out
-/.DS_Store
+.vscode/
+dawn/
+out/
+.DS_Store
