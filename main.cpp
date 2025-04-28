@@ -37,7 +37,7 @@ struct GPUBuffers {
 
 void GetGPUContext(GPUContext* context) {
     wgpu::InstanceDescriptor instanceDescriptor{};
-    instanceDescriptor.features.timedWaitAnyEnable = true;
+    instanceDescriptor.capabilities.timedWaitAnyEnable = true;
     wgpu::Instance instance = wgpu::CreateInstance(&instanceDescriptor);
     if (instance == nullptr) {
         std::cerr << "Instance creation failed!\n";
