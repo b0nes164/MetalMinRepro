@@ -2,3 +2,6 @@
 dawn/
 out/
 .DS_Store
+initShader.metallib
+stressShader.metallib
+metalMinRepro
