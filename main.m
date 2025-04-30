@@ -105,6 +105,11 @@ static bool DispatchKernels(id<MTLCommandQueue> commandQueue, id<MTLComputePipel
     [computeEncoder endEncoding];
     [commandBuffer commit];
     [commandBuffer waitUntilCompleted];
+
+    if (commandBuffer.error) {
+        NSLog(@"Command buffer execution failed with error: %@", commandBuffer.error);
+    }
+
     return true;
 }
 
@@ -133,6 +138,8 @@ static bool ValidateScanBuffer(id<MTLCommandQueue> commandQueue, id<MTLBuffer> s
     [commandBuffer waitUntilCompleted];
 
     uint32_t* scan = transferBuffer.contents;
+    uint32_t errs = 0;
+    const uint32_t errLimit = 384;
     for (uint32_t k = 0; k < TEST_SIZE; ++k) {
         uint32_t index = k * 2;
         uint32_t rejoinedVal = (scan[index] & 0xffff) | (scan[index + 1] << 16);
@@ -141,10 +148,13 @@ static bool ValidateScanBuffer(id<MTLCommandQueue> commandQueue, id<MTLBuffer> s
         if (rejoinedVal != 1024 * (k + 1)) {
             NSLog(@"Test failed: got %u at %u (flags: 0x%x, 0x%x)\n",
                   rejoinedVal, k, flag0, flag1);
-            return false;
+            errs++;
+        }
+        if (errs > errLimit) {
+            break;
         }
     }
-    return true;
+    return errs == 0;
 }
 
 bool CheckError(uint32_t errCode, uint32_t got, uint32_t tile_id, uint32_t tid) {
@@ -282,7 +292,6 @@ void run(uint32_t batchSize) {
     MTLSize stressGridDim = MTLSizeMake(TEST_SIZE, 1, 1);
     MTLSize stressBlockDim = MTLSizeMake(32, 1, 1);  // Exactly equal to simdgroup size
 
-    uint testsPassed = 0;
     for (uint32_t i = 0; i < batchSize; ++i) {
         if (!DispatchKernels(commandQueue, initPSO, stressPSO, scanBumpBuffer, scanBuffer,
                              errorsBuffer, initGridDim, initBlockDim, stressGridDim,
@@ -301,11 +310,13 @@ void run(uint32_t batchSize) {
             NSLog(@"Batch %u: Error buffer check FAILED (errors found and printed).", i + 1);
         }
 
-        testsPassed += validScan && validErr ? 1 : 0;
+        if (!validScan || !validErr) {
+            NSLog(@"Batch %u: FAILED. Exiting test", i + 1);
+            return;
+        }
     }
 
-    printf("%u / %u ", testsPassed, batchSize);
-    printf(testsPassed == batchSize ? "ALL TESTS PASSED\n" : "TESTS FAILED\n");
+    printf("%u / %u ALL TESTS PASSED\n", batchSize, batchSize);
 }
 
 int main(int argc, const char* argv[]) {
