@@ -19,6 +19,12 @@ In the chained formulation, individual workgroup n:
   - If that entry is INCLUSIVE, combine it locally with my partial solution, and post that to entry n tagged with INCLUSIVE. Return.
   - If that entry is READY, combine it locally with my partial solution, decrement lookback_id, and jump to the top of the loop
 
+In the test we are submitting, the "partial solution" is the integer 1024, and "combine" is add. So we expect after our implementation completes, array entry n contains the value 1024 \* n.
+
+### More grungy technical details
+
+We lied about the structure of the array above. It's actually an array of TWO u32s per workgroup. We split the 32b value that we wish to store across the two u32s (in bits 15:0) and store the flag values in bits 31:30. We choose this structure because we wish to use all 32 bits of the value in our computations and can't store both a 32b value and 2 bits of flags in one u32. References to `split` and `join` in the source code are implementing this structure. We have not seen any issues with our use of this structure.
+
 ## Building and running the test
 
 The below run is on a M3.
@@ -37,7 +43,7 @@ clang++ -fmodules -framework CoreGraphics main.m -o metalMinRepro
 The test could fail in multiple ways and will print an error that looks like what's below. We have seen one specific failure mode on M1, "Scan buffer validation".
 
 ```
-2025-04-30 09:29:56.283 metalMinRepro[79282:11031643] Test failed: got 1024 at 33186
+2025-04-30 09:29:56.283 metalMinRepro[79282:11031643] Test failed: got 1024 at 33186 (flags: 0x40000000, 0x40000000)
 2025-04-30 09:29:56.283 metalMinRepro[79282:11031643] Batch 146: Scan buffer validation FAILED.
 ```
 
@@ -49,8 +55,14 @@ We ran this test on two different MacBooks:
 - MacBook Air, 13-inch 2024, M3. Sequoia 15.4.1.
 
 M3 tests completed quickly (~3 ms per test), and always correctly.
-M1 tests run much slower (~600--3000 ms per test) and intermittently fail, and when they do, they fail in bunches.
+M1 tests run much slower (~600--12000 ms per test) and intermittently fail, and when they do, they fail in bunches.
+
+## What this specific failure indicates
+
+`Test failed: got 1024 at 33186 (flags: 0x40000000, 0x40000000)`
+
+Workgroup 33186 posted its part of the solution (1024) and marked it as READY (0x40000000). However, neither this workgroup (nor any later workgroup) ever enter the lookback loop and update this value.
 
 ## What we think
 
-So to recap, the starvation on the M1 Max is not stressing the hardware to the point that a failure emerges, but instead, the starvation is causing the watchdog to kill the shader---albeit while allowing the program to coninue running.
+We believe that the failure indicates that workgroups are resident on the GPU but are not run; they are being blocked by other workgroups. In a word, they are starved. The starvation does not stress the hardware to the point where we see a failure, but instead the starvation eventually causes a watchdog to kill the shader (but allows the CPU program to continue running).
