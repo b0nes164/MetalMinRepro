@@ -4,7 +4,7 @@ tl;dr: On M1, we demonstrate a compute shader that intermittently exhibits a sta
 
 ## Background
 
-We are implementing compute primitives on the GPU. Specifically, we are using a "chained" formulation of the parallel primitive "scan" (prefix sum). (FWIW, this formulation is the foundation of the fastest scan (prefix-sum) and sort implementations on GPUs.) The primary data structure here is an array in global memory (the "scan buffer") with size equal to the number of workgroups. Each workgroup "owns" one entry in this array. Each entry in the array is marked (in bits 31 and 30) as NOT_READY (the initial value), READY, or INCLUSIVE.
+We are implementing compute primitives on the GPU. Specifically, we are using a "chained" formulation of the parallel primitive "scan" (prefix sum). (FWIW, this formulation is the foundation of the fastest scan (prefix-sum) and sort implementations on GPUs. The relevant academic publication is [Merrill and Garland, 2016](https://research.nvidia.com/publication/2016-03_single-pass-parallel-prefix-scan-decoupled-look-back).) The primary data structure here is an array in global memory (the "scan buffer") with size equal to the number of workgroups. Each workgroup "owns" one entry in this array. Each entry in the array is marked (in bits 31 and 30) as NOT_READY (the initial value), READY, or INCLUSIVE.
 
 - If entry n is READY, then entry n contains the partial result computed by workgroup n.
 - If entry n is INCLUSIVE, then entry n contains the partial result that combines the results of workgroups 0--n, inclusive.
