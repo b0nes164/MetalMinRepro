@@ -136,8 +136,11 @@ static bool ValidateScanBuffer(id<MTLCommandQueue> commandQueue, id<MTLBuffer> s
     for (uint32_t k = 0; k < TEST_SIZE; ++k) {
         uint32_t index = k * 2;
         uint32_t rejoinedVal = (scan[index] & 0xffff) | (scan[index + 1] << 16);
+        uint32_t flag0 = scan[index] & (FLAG_READY | FLAG_INCLUSIVE);
+        uint32_t flag1 = scan[index] & (FLAG_READY | FLAG_INCLUSIVE);
         if (rejoinedVal != 1024 * (k + 1)) {
-            NSLog(@"Test failed: got %u at %u\n", rejoinedVal, k);
+            NSLog(@"Test failed: got %u at %u (flags: 0x%x, 0x%x)\n",
+                  rejoinedVal, k, flag0, flag1);
             return false;
         }
     }
