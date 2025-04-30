@@ -139,7 +139,7 @@ static bool ValidateScanBuffer(id<MTLCommandQueue> commandQueue, id<MTLBuffer> s
 
     uint32_t* scan = transferBuffer.contents;
     uint32_t errs = 0;
-    const uint32_t errLimit = 384;
+    const uint32_t errLimit = 2048;
     for (uint32_t k = 0; k < TEST_SIZE; ++k) {
         uint32_t index = k * 2;
         uint32_t rejoinedVal = (scan[index] & 0xffff) | (scan[index + 1] << 16);
