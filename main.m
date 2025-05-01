@@ -1,5 +1,4 @@
 #import <Metal/Metal.h>
-#include <stdbool.h>  // For bool, true, false
 
 // Must exactly match the shader.
 const uint32_t TEST_SIZE = 65535;
