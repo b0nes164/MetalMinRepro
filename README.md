@@ -44,13 +44,15 @@ clang++ -fmodules -framework CoreGraphics main.m -o metalMinRepro
 ./metalMinRepro 10000  2.68s user 1.18s system 11% cpu 33.421 total
 ```
 
+The executable `metalMinRepro` takes one argument, the number of trials. It may take tens of minutes to reproduce the issue on M1. Start with 100 trials, then go to 1000 and do a few runs at 1000.
+
 The test could fail in multiple ways and will print an error for each of them. We have seen two different kinds of errors on M1 but no errors on M3 or M4.
 
 ### Timeout failure
 
-After submitting each command buffer, we check to see if the compute shader successfully executed. 
+After submitting each command buffer, we check to see if the compute shader successfully executed.
 
-We have seen one error code, timeout, only on the M1. This indicates starvation induced by a lack of forward progress guarantees. 
+We have seen one error code, timeout, only on the M1. This indicates starvation induced by a lack of forward progress guarantees.
 
 ```
 2025-04-30 11:44:47.552 metalMinRepro[82313:11136212] Command buffer execution failed with error: Error Domain=MTLCommandBufferErrorDomain Code=1 "Internal Error (0000000e:Internal Error)" UserInfo={NSLocalizedDescription=Internal Error (0000000e:Internal Error), NSUnderlyingError=0x600002740630 {Error Domain=IOGPUCommandQueueErrorDomain Code=14 "(null)"}}
@@ -68,13 +70,16 @@ We have seen one specific failure mode on M1, "Scan buffer validation".
 ```
 
 ### Error buffer validation failure
+
 The test program also checks a dedicated "error buffer" that the stressShader can write to if it detects specific inconsistencies during its execution. This buffer allows for more granular error reporting from within the shader's logic. An error logged here would manifest as a specific message printed to the console by the CheckError function on the CPU side after the GPU work is completed. These errors would indicate the following:
 
 - ERROR_TYPE_MESSAGE: This error is logged if a workgroup n, during its lookback phase (reading entry n-1, n-2, etc.), encounters a flag_payload in the scan buffer that does not conform to any of the valid, expected states (i.e., NOT_READY, a correctly formed READY state for that entry, or a correctly formed INCLUSIVE state). This could imply:
+
   - The workgroup whose entry is being read (the lookback_id entry) may have stalled or malfunctioned before it could update its scan buffer entry to a well-defined state.
   - A more subtle race condition or memory coherency issue might be leading to a corrupt or unexpected flag_payload being observed. This is a point of attention given our "grungy technical detail" of splitting a logical entry across two u32 values; an inconsistency here could manifest as this error.
 
 - ERROR_TYPE_SHUFFLE_READY or ERROR_TYPE_SHUFFLE_INC: These errors are triggered if, after a workgroup reads what it believes to be valid flags and data from a lookback_id entry and combines this with its local partial sum, the resulting new partial sum (prev_red) is mathematically incorrect based on the expected values for that stage of the scan. This could point to:
+
   - Faulty `simd_shuffle` operations within our `join` function; investigating this is a primary diagnostic purpose for these error types. Such faults can occur if threads within a SIMD group (subgroup) take divergent execution paths due to branching and then fail to correctly reconverge before the `simd_shuffle` is called. An improperly executed shuffle directly leads to a corrupted `prev_red` value.
   - Corruption in the data portion (VALUE_MASK) of the flag_payload read from the scan buffer, even if the flags themselves appeared valid.
 
@@ -88,10 +93,10 @@ We ran this test on three different MacBooks:
 
 - MacBook Pro, 16-inch 2021, M1 Max. Sequoia 15.4.1.
 - MacBook Air, 13-inch 2024, M3. Sequoia 15.4.1.
-- Macbook Pro, MX2Y3LL/A,    M4. Sequoia 15.4.1.
+- Macbook Pro, MX2Y3LL/A, M4. Sequoia 15.4.1.
 
 M4 and M3 tests completed quickly (~2.5 ms, ~3 ms per test), and always correctly.
-M1 tests run much slower (~600--12000 ms per test) and intermittently fail, and when they do, they fail in bunches.
+M1 tests run much slower (~600--12000 ms per test) and intermittently fail, and when they do, they fail in bunches (many workgroups get an incorrect result). The large difference in runtime between M1 and M3/M4 is also indicative of the starvation problem.
 
 ## What this specific failure indicates
 
