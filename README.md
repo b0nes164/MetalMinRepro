@@ -48,6 +48,10 @@ The test could fail in multiple ways and will print an error for each of them. W
 
 ### Timeout failure
 
+After submitting each command buffer, we check to see if the compute shader successfully executed. 
+
+We have seen one error code, timeout, only on the M1. This indicates starvation induced by a lack of forward progress guarantees. 
+
 ```
 2025-04-30 11:44:47.552 metalMinRepro[82313:11136212] Command buffer execution failed with error: Error Domain=MTLCommandBufferErrorDomain Code=1 "Internal Error (0000000e:Internal Error)" UserInfo={NSLocalizedDescription=Internal Error (0000000e:Internal Error), NSUnderlyingError=0x600002740630 {Error Domain=IOGPUCommandQueueErrorDomain Code=14 "(null)"}}
 ```
@@ -76,7 +80,7 @@ The test program also checks a dedicated "error buffer" that the stressShader ca
 
 - ERROR_TYPE_SGSIZE: This error indicates a mismatch between the BLOCK_DIM (the subgroup size the shader was compiled expecting) and the actual subgroup size (sgSize) reported by the hardware at runtime. This is a fundamental configuration check performed at the beginning of the shader.
 
-We have not observed any of these errors on any device.
+**We have not observed any of these errors on any device**.
 
 ## Repro details
 
