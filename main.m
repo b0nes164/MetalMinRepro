@@ -108,6 +108,11 @@ static bool DispatchKernels(id<MTLCommandQueue> commandQueue, id<MTLComputePipel
 
     if (commandBuffer.error) {
         NSLog(@"Command buffer execution failed with error: %@", commandBuffer.error);
+        NSError *error = commandBuffer.error;
+        if ([error.domain isEqualToString:MTLCommandBufferErrorDomain]) {
+            MTLCommandBufferError errorCode = (MTLCommandBufferError)error.code;
+            NSLog(@"Metal Command Buffer Error Code: %ld", (long)errorCode);
+        }
     }
 
     return true;
